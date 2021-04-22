@@ -125,7 +125,7 @@ void FeatureCrosslinkConnectionsLookUp::fillTables(IngredientsType& ingredients)
 				VectorDouble3 jumpVector(posHead-bond-posX); // tracks if one bond jumps across periodic images 
 				
 				//direct connection of two cross links
-				if (molecules.getNumLinks(head) > 2) {
+				if ( molecules[head].isReactive() && molecules.getNumLinks(head) > 2) {
 					NeighborIDs.push_back( neighborX(head, 1, jumpVector) );
 				}else{ 
 					uint32_t nSegments(1);
