@@ -172,7 +172,7 @@ TEST_CASE( "Test class UpdaterReadCrosslinkConnections" )
         REQUIRE(ingredients.getMolecules().areConnected(15,2) );
         REQUIRE(ingredients.getMolecules().areConnected(16,3) );
         
-
+        REQUIRE(0==remove(filename.c_str()));    
     }
     //restore cout 
     std::cout.rdbuf(originalBuffer);

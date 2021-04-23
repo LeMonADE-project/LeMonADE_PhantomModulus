@@ -29,24 +29,26 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include <LeMonADE/updater/AbstractUpdater.h>
-#include <LeMonADE_PM/updater/moves/MoveForceEquilibrium.h>
 #include <vector>
  /**
  * @class UpdaterForceBalancedPosition
  * @tparam IngredientsType
  */
 
- template <class IngredientsType>
+ template <class IngredientsType, class moveType >
 class UpdaterForceBalancedPosition:public AbstractUpdater
 {
 public:
     //! constructor for UpdaterForceBalancedPosition
-    UpdaterForceBalancedPosition(IngredientsType& ing_, double threshold_):ing(ing_),threshold(threshold_){};
+    UpdaterForceBalancedPosition(IngredientsType& ing_, double threshold_ ):
+    ing(ing_),threshold(threshold_){};
     
-    virtual void initialize(){};
+    virtual void initialize(){}// init(move);};
     bool execute();
     virtual void cleanup(){};  
 
+    void setFilename(const std::string filename) {move.setFilename(filename); }
+    void setRelaxationParameter( const double relax ) {move.setRelaxationParameter(relax);}
 private:
     //!copy of the main container for the system informations 
     IngredientsType& ing;
@@ -55,13 +57,26 @@ private:
     double threshold;
     
     //! move to equilibrate the cross links by force equilibrium
-    MoveForceEquilibrium move;
+    moveType move;
     
     //! random number generator 
     RandomNumberGenerators rng;
+    
+    // //! input filename for the MoveNonLinearForceEquilibrium
+    // std::string filename; 
+    // //! relaxation parameter
+    // double relaxationParameter;
+    // //!initialize of the move : MoveForceEquilibrium
+    // void init ( MoveForceEquilibrium& move ) {std::cout << "Nothing to initialize for this move type.\n";}
+    // //!initialize of the move :MoveNonLinearForceEquilibrium
+    // void init (MoveNonLinearForceEquilibrium& move ) {
+    //     move.setRelaxationParameter(relaxationParameter);
+    //     move.setFilename(filename);
+    // };
+    
 };
-template <class IngredientsType>
-bool UpdaterForceBalancedPosition<IngredientsType>::execute(){
+template <class IngredientsType, class moveType>
+bool UpdaterForceBalancedPosition<IngredientsType,moveType>::execute(){
     std::cout << "UpdaterForceBalancedPosition::execute(): Start equilibration" <<std::endl;
     double avShift(threshold*1.1);
     uint32_t StartMCS(ing.getMolecules().getAge());

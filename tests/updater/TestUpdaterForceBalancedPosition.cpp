@@ -46,6 +46,7 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 
 
 
+
 TEST_CASE( "Test class UpdaterForceBalancedPosition" ) 
 {
     typedef LOKI_TYPELIST_4(FeatureBox, FeatureCrosslinkConnectionsLookUp,FeatureFixedMonomers,FeatureSystemInformationLinearMeltWithCrosslinker ) Features;
@@ -56,8 +57,8 @@ TEST_CASE( "Test class UpdaterForceBalancedPosition" )
     std::streambuf* originalBuffer;
     std::ostringstream tempStream;
     //redirect stdout 
-    // originalBuffer=std::cout.rdbuf();
-    // std::cout.rdbuf(tempStream.rdbuf());
+    originalBuffer=std::cout.rdbuf();
+    std::cout.rdbuf(tempStream.rdbuf());
   
     SECTION(" Test if the labels are moved ","[UpdaterForceBalancedPosition]")
     {
@@ -114,11 +115,6 @@ TEST_CASE( "Test class UpdaterForceBalancedPosition" )
         ingredients.modifyMolecules()[4].setReactive(true); 
         ingredients.modifyMolecules()[4].setNumMaxLinks(3); 
 
-
-        // ingredients.modifyMolecules()[1].setMovableTag(false);
-        // ingredients.modifyMolecules()[2].setMovableTag(false);
-        // ingredients.modifyMolecules()[3].setMovableTag(false);
-        // ingredients.modifyMolecules()[4].setMovableTag(false);
         ingredients.modifyMolecules()[5].setMovableTag(false);
         ingredients.modifyMolecules()[6].setMovableTag(false);
         ingredients.modifyMolecules()[7].setMovableTag(false);
@@ -131,15 +127,15 @@ TEST_CASE( "Test class UpdaterForceBalancedPosition" )
         REQUIRE(ingredients.getMolecules().size()==13 );
         REQUIRE_NOTHROW(ingredients.synchronize(ingredients));
         //check some basics
-        UpdaterForceBalancedPosition<IngredientsType> updater(ingredients, 0.0001);
+        UpdaterForceBalancedPosition<IngredientsType,MoveForceEquilibrium> updater(ingredients, 0.0001);
         updater.execute();
         auto vec2=LemonadeDistCalcs::MinImageVector(VectorDouble3(0.,0.,0.),ingredients.getMolecules()[0].getVector3D(),ingredients );
-        REQUIRE(vec2.getX() == Approx(5.25));
-        REQUIRE(vec2.getY() == Approx(6.5));
-        REQUIRE(vec2.getZ() == Approx(6.25));
+        REQUIRE(vec2.getX() == Approx(5.3125));
+        REQUIRE(vec2.getY() == Approx(6.375));
+        REQUIRE(vec2.getZ() == Approx(5.8125));
     }
     //restore cout 
-    // std::cout.rdbuf(originalBuffer);
+    std::cout.rdbuf(originalBuffer);
 
 }
 

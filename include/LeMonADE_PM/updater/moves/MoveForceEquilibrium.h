@@ -64,12 +64,12 @@ private:
     //Gaussina force extension relation 
     //f=R*3/(N*b^2)
     VectorDouble3 FE(VectorDouble3 extensionVector, double nSegs){
-        return extensionVector*3./(std::sqrt(nSegs)*bondlength*bondlength);
+        return extensionVector*3./((nSegs)*bondlength*bondlength);
     }
     //Gaussian extension force relation 
     //R=-f/3*N*b^2
     VectorDouble3 EF(VectorDouble3 force, double nSegs){
-        return force/(3.)*std::sqrt(nSegs)*bondlength*bondlength;
+        return force/(3.)*(nSegs)*bondlength*bondlength;
     }
 
     //calculate the shift for the cross link

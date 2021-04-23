@@ -122,15 +122,15 @@ TEST_CASE( "Test class MoveForceEquilibrium" )
         auto vec=move.getShiftVector();
         REQUIRE(vec.getY() == 0 );
         REQUIRE(vec.getX() == 0 );
-        REQUIRE(vec.getZ() == Approx(-4.) );
+        REQUIRE(vec.getZ() == Approx(-2.) );
         ingredients.modifyMolecules()[0].setAllCoordinates(12.0,17.,3.0);
         move.init(ingredients,0);
         move.check(ingredients);
         move.apply(ingredients);
         vec=move.getShiftVector();
-        REQUIRE(vec.getX() == Approx( -12.));
-        REQUIRE(vec.getY() == Approx(-22.));
-        REQUIRE(vec.getZ() == Approx( 6.));
+        REQUIRE(vec.getX() == Approx( -6.));
+        REQUIRE(vec.getY() == Approx(-11.));
+        REQUIRE(vec.getZ() == Approx( 3.));
     }
     //restore cout 
     std::cout.rdbuf(originalBuffer);

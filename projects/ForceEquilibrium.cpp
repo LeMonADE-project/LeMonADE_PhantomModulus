@@ -48,6 +48,8 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <LeMonADE_PM/updater/UpdaterForceBalancedPosition.h>
 #include <LeMonADE_PM/updater/UpdaterReadCrosslinkConnections.h>
+#include <LeMonADE_PM/updater/moves/MoveForceEquilibrium.h>
+#include <LeMonADE_PM/updater/moves/MoveNonLinearForceEquilibrium.h>
 #include <LeMonADE_PM/feature/FeatureCrosslinkConnectionsLookUp.h>
 #include <LeMonADE_PM/analyzer/AnalyzerEquilbratedPosition.h>
 
@@ -60,19 +62,24 @@ int main(int argc, char* argv[]){
 		std::string outputDataPos("CrosslinkPosition.dat");
 		std::string outputDataDist("ChainExtensionDistribution.dat");
 		std::string inputConnection("BondCreationBreaking.dat");
+		std::string feCurve("");
+		double relaxationParameter(10.);
 		double threshold(0.5);
 		double stepwidth(1.0);
 		double minConversion(50.0);
+		bool custom(false);
 		
 		bool showHelp = false;
 		auto parser
-			= clara::detail::Opt(        inputBFM, "inputBFM (=inconfig.bfm)"                        ) ["-i"]["--input"          ] ("(required)Input filename of the bfm file"                                    ).required()
-			| clara::detail::Opt( inputConnection, "inputConnection (=BondCreationBreaking.dat)"     ) ["-d"]["--inputConnection"] ("used for the time development of the topology. "                             ).required()
-			| clara::detail::Opt(   outputDataPos, "outputDataPos (=CrosslinkPosition.dat)"          ) ["-o"]["--outputPos"      ] ("(optional) Output filename of the crosslink ID and the equilibrium Position.").optional()
-			| clara::detail::Opt(  outputDataDist, "outputDataDist (=ChainExtensionDistribution.dat)") ["-c"]["--outputDist"     ] ("(optional) Output filename of the chain extension distribution."             ).optional()
-			| clara::detail::Opt(       stepwidth, "stepwidth"                                       ) ["-s"]["--stepwidth"      ] ("(optional) Width for the increase in percentage. Default: 1%."               ).optional()
-			| clara::detail::Opt(   minConversion, "minConversion"                                   ) ["-u"]["--minConversion"  ] ("(optional) Minimum conversion to be read in. Default: 50%."                  ).optional()
-			| clara::detail::Opt(       threshold, "threshold"                                       ) ["-t"]["--threshold"      ] ("(optional) Threshold of the average shift. Default 0.5 ."                    ).optional()
+			= clara::detail::Opt(            inputBFM, "inputBFM (=inconfig.bfm)"                        ) ["-i"]["--input"          ] ("(required)Input filename of the bfm file"                                    ).required()
+			| clara::detail::Opt(     inputConnection, "inputConnection (=BondCreationBreaking.dat)"     ) ["-d"]["--inputConnection"] ("used for the time development of the topology. "                             ).required()
+			| clara::detail::Opt(       outputDataPos, "outputDataPos (=CrosslinkPosition.dat)"          ) ["-o"]["--outputPos"      ] ("(optional) Output filename of the crosslink ID and the equilibrium Position.").optional()
+			| clara::detail::Opt(      outputDataDist, "outputDataDist (=ChainExtensionDistribution.dat)") ["-c"]["--outputDist"     ] ("(optional) Output filename of the chain extension distribution."             ).optional()
+			| clara::detail::Opt(           stepwidth, "stepwidth"                                       ) ["-s"]["--stepwidth"      ] ("(optional) Width for the increase in percentage. Default: 1%."               ).optional()
+			| clara::detail::Opt(       minConversion, "minConversion"                                   ) ["-u"]["--minConversion"  ] ("(optional) Minimum conversion to be read in. Default: 50%."                  ).optional()
+			| clara::detail::Opt(           threshold, "threshold"                                       ) ["-t"]["--threshold"      ] ("(optional) Threshold of the average shift. Default 0.5 ."                    ).optional()
+			| clara::detail::Opt(             feCurve, "feCurve (="")"                                   ) ["-f"]["--feCurve"        ] ("(optional) Force-Extension curve. Default \"\"."                             ).optional()
+			| clara::detail::Opt( relaxationParameter, "relaxationParameter (=10)"                       ) ["-r"]["--relax"          ] ("(optional) Relaxation parameter. Default 10.0 ."                             ).optional()
 			| clara::Help( showHelp );
 		
 	    auto result = parser.parse( clara::Args( argc, argv ) );
@@ -92,7 +99,10 @@ int main(int argc, char* argv[]){
 	      std::cout << "stepwidth             : " << stepwidth              << std::endl;
 	      std::cout << "minConversion         : " << minConversion          << std::endl;
 	      std::cout << "threshold             : " << threshold              << std::endl; 
+		  std::cout << "feCurve               : " << feCurve                << std::endl;
 	    }
+		if (! feCurve.empty()) custom=true;
+		
 		///////////////////////////////////////////////////////////////////////////////
 		///end options parsing
 		///////////////////////////////////////////////////////////////////////////////
@@ -146,7 +156,14 @@ int main(int argc, char* argv[]){
 		TaskManager taskmanager2;
 		//read bonds and positions stepwise
 		taskmanager2.addUpdater( new UpdaterReadCrosslinkConnections<Ing2>(myIngredients2, inputConnection, stepwidth, minConversion) );
-		taskmanager2.addUpdater( new UpdaterForceBalancedPosition<Ing2>(myIngredients2, threshold) );
+		if (custom) 
+			taskmanager2.addUpdater( new UpdaterForceBalancedPosition<Ing2,MoveForceEquilibrium>(myIngredients2, threshold) );
+		else {
+			auto updater = new UpdaterForceBalancedPosition<Ing2,MoveNonLinearForceEquilibrium>(myIngredients2, threshold) ;
+			updater->setFilename(feCurve);
+			updater->setRelaxationParameter(relaxationParameter);
+			taskmanager2.addUpdater( updater );
+		}
 		taskmanager2.addAnalyzer(new AnalyzerEquilbratedPosition<Ing2>(myIngredients2,outputDataPos, outputDataDist));
 		//initialize and run
 		taskmanager2.initialize();
