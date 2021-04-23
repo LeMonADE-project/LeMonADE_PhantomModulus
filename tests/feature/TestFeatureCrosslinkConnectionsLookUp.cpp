@@ -33,14 +33,14 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 #include <LeMonADE/core/Ingredients.h>
 #include <LeMonADE/feature/FeatureBox.h>
 #include <LeMonADE/utility/Vector3D.h>
-
+#include <LeMonADE/feature/FeatureSystemInformationLinearMeltWithCrosslinker.h>
 #include <extern/catch.hpp>
 
 #include <LeMonADE_PM/feature/FeatureCrosslinkConnectionsLookUp.h>
 
 TEST_CASE( "Test class FeatureCrosslinkConnectionsLookUp" ) 
 {
-    typedef LOKI_TYPELIST_2(FeatureBox, FeatureCrosslinkConnectionsLookUp ) Features;
+    typedef LOKI_TYPELIST_3(FeatureBox, FeatureCrosslinkConnectionsLookUp,FeatureSystemInformationLinearMeltWithCrosslinker ) Features;
     typedef ConfigureSystem<VectorDouble3,Features,4> Config;
     typedef Ingredients<Config> IngredientsType;
 
@@ -94,6 +94,20 @@ TEST_CASE( "Test class FeatureCrosslinkConnectionsLookUp" )
         ingredients.modifyMolecules().addMonomer(8.,6.,6.);
         ingredients.modifyMolecules().connect(4,11);
         ingredients.modifyMolecules().connect(4,12);
+        ingredients.setNumOfChains(0);
+        ingredients.setNumOfMonomersPerChain(0);
+        ingredients.modifyMolecules()[0].setReactive(true); 
+        ingredients.modifyMolecules()[0].setNumMaxLinks(4); 
+        ingredients.modifyMolecules()[1].setReactive(true); 
+        ingredients.modifyMolecules()[1].setNumMaxLinks(4); 
+        ingredients.modifyMolecules()[2].setReactive(true); 
+        ingredients.modifyMolecules()[2].setNumMaxLinks(4); 
+        ingredients.modifyMolecules()[3].setReactive(true); 
+        ingredients.modifyMolecules()[3].setNumMaxLinks(4); 
+        ingredients.modifyMolecules()[4].setReactive(true); 
+        ingredients.modifyMolecules()[4].setNumMaxLinks(4); 
+
+
 
         REQUIRE(ingredients.getMolecules().size()==13 );
         REQUIRE_NOTHROW(ingredients.synchronize(ingredients));

@@ -29,7 +29,7 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 #define LEMONADE_PM_UPDATER_MOVES_MOVENONLINEARFORCEEQUILIBRIUM_H
 #include <limits>
 #include <fstream>
-#include <LeMonADE_PM/updater/moves/MoveNonLinearForceEquilibriumBase.h>
+#include <LeMonADE_PM/updater/moves/MoveForceEquilibriumBase.h>
 #include <LeMonADE/utility/DistanceCalculation.h>
 #include <LeMonADE_PM/utility/neighborX.h>
 
@@ -48,8 +48,12 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 
 class MoveNonLinearForceEquilibrium:public MoveForceEquilibriumBase<MoveNonLinearForceEquilibrium>{
 public:
-    MoveNonLinearForceEquilibrium(std::filename input_, double relaxationChain_):input(input_),relaxationChain(relaxationChain_),bondlength(2.68){};
-
+    //! constructor for the class MoveNonLinearForceEquilibrium taking the filename of the force extension relation and the realaxation parameter for the chain 
+    MoveNonLinearForceEquilibrium(std::string filename_="", double relaxationChain_=1.):
+        filename(filename_),bondlength(2.68){
+            if( !filename.empty() ) createTable();
+            setRelaxationParameter(relaxationChain_);
+        };
     // overload initialise function to be able to set the moves index and direction if neccessary
     template <class IngredientsType> void init(const IngredientsType& ing);
     template <class IngredientsType> void init(const IngredientsType& ing, uint32_t index);
@@ -58,50 +62,74 @@ public:
     template <class IngredientsType> bool check(IngredientsType& ing);
     template< class IngredientsType> void apply(IngredientsType& ing);
 
+    //!read file to create a lookup table of the force extension curve 
+    void createTable();
+    // //!read file to create a lookup table of the force extension curve 
+    // void createTable(std::string filename_){
+    //     setFilename(filename); 
+    //     createTable();}
+    //! set the filename for the force extension data 
+    void setFilename(std::string filename_){filename=filename_;createTable();}
+    //! get the filename for the force extension data 
+    std::string const getFilename(){return filename;}
+    
+    //! set the relaxation parameter for the cross link
+    void setRelaxationParameter(double relaxationChain_){
+        relaxationChain=relaxationChain_;
+        springConstant = relaxationChain*bondlength*bondlength/(-3.);
+    }
+    //! get the relaxation parameter for the cross link 
+    double getRelaxationParameter(){return relaxationChain;} 
+    //uses the read force extension relation 
+    VectorDouble3 EF(VectorDouble3 extensionVector){
+        uint32_t length( static_cast<uint32_t>(round(extensionVector.getLength())) );
+        if ( max_extension < length ){
+            std::stringstream errormessage; 
+            errormessage << "The length of the extension vector is greater than the maximum given in the file: \n"
+                         << "length is  " << length 
+                         << " maximum is " << max_extension << "\n";
+            throw std::runtime_error(errormessage.str());
+        }
+        if (length == 0 )
+            return VectorDouble3(0.,0.,0.);
+        return force_extension[length]*extensionVector.normalize();
+
+    }
+    //Gaussian extension force relation 
+    //R=-f/3*N*b^2
+    VectorDouble3 FE(VectorDouble3 const force ) const {
+        return force*springConstant;
+    }
+
 private:
     //average square bond length 
     const double bondlength;
-    //input filename for the force extension curve 
-    std::string input;
+    //filename filename for the force extension curve 
+    std::string filename;
     
     //minimum force in the file 
-    double min_force:
+    double min_force;
     //maximum force in the file 
     double max_force;
     //force steps 
     double force_steps;
-    
+   
     //min_extension in the file 
     double min_extension;
     //maximum extensions in the file 
     double max_extension;
     //extension steps 
     double extension_steps;
-    
-    //force extension mapping
-    std::map<double, double> extension_force
-    //extension force mapping 
-    std::vector<double> force_extension;
 
+    //spring constant for the equivalent chain used for the relaxation of the cross links 
+    double springConstant;
+   
+    //force extension mapping
+    std::map<double, double> extension_force;
+    //extension force mapping index=extension rounded to int 
+    std::vector<double> force_extension;
     //an equivalent chain which relaxes the cross link
     double relaxationChain;
-
-
-
-    //read file to create a lookup table of the force extension curve 
-    void createTable();
-
-    //Gaussina force extension relation 
-    //f=R*3/(N*b^2)
-    VectorDouble3 FE(VectorDouble3 extensionVector, double nSegs){
-        return extensionVector*3./(std::sqrt(nSegs)*bondlength*bondlength);
-    }
-    //Gaussian extension force relation 
-    //R=-f/3*N*b^2
-    VectorDouble3 EF(VectorDouble3 force, double nSegs){
-        return force/(-3.)*std::sqrt(nSegs)*bondlength*bondlength;
-    }
-
     //calculate the shift for the cross link
     template< class IngredientsType >
     VectorDouble3 CalculateShift(IngredientsType& ing ){
@@ -111,42 +139,35 @@ private:
         double avNSegments(0.);
         if (Neighbors.size() > 0) {
             VectorDouble3 Position(ing.getMolecules()[this->getIndex()].getVector3D());      
-                // std::cout << "CorssLinkPos=" << Position << std::endl;
             for (size_t i = 0; i < Neighbors.size(); i++){
                 VectorDouble3 vec(Position-ing.getMolecules()[Neighbors[i].ID].getVector3D()-Neighbors[i].jump);
-                // avNSegments+=1./Neighbors[i].segDistance;
-                // force+=FE(vec,Neighbors[i].segDistance);
-                force+=force_extension[vec.getLength()]*vec.normalize();
+                force+=EF(vec);//Neighbors[i].segDistance
             }
-            // force/=(1.*Neighbors.size());  
-            shift=EF(force,relaxationChain);
+            shift=FE(force/(static_cast<double>(Neighbors.size()) ));
         }
         return shift;
     };
-
-
 };
 /////////////////////////////////////////////////////////////////////////////
 /////////// implementation of the members ///////////////////////////////////
 void MoveNonLinearForceEquilibrium::createTable(){
-    std::ifstream in(input);
+    std::ifstream in(filename);
     uint32_t counter(0);
-    while(in.good()){
+    while(in.good() && in.peek()!=EOF){
         std::string line;
-        getline(stream, line);
+        getline(in, line);
         //ignore comments and blank lines 
-        if (line.empty())
-            findStartofData = true;
-        else if (line.at(0) == '#') //go to next line
+        while (line.at(0) == '#' || line.empty() ) //go to next line
             continue;
         //read data 
         double force, extension;
-        std::stringstream ss << line;
+        std::stringstream ss ;
+        ss<< line;
         ss>>force >> extension; 
         if(min_force > force ) min_force=force; 
         if(max_force < force ) max_force=force; 
         if(min_extension > extension ) min_extension=extension; 
-        if(min_extension < extension ) max_extension=extension; 
+        if(max_extension < extension ) max_extension=extension; 
         extension_force.insert(extension_force.end(),std::pair<double,double>(force, extension));
         if(counter==1){
             force_steps=max_force-min_force;
@@ -158,9 +179,9 @@ void MoveNonLinearForceEquilibrium::createTable(){
      //make a entry from 0 to max_extension in steps of 1 
     for ( auto r=0;r<static_cast<uint32_t>(max_extension); r++   ){
         if(r==0)
-            extension_force.push_back(0.);
+            force_extension.push_back(0.);
         else{
-            auto it_last=extension_force.begin()
+            auto it_last=extension_force.begin();
             for (auto it=extension_force.begin(); it !=extension_force.end();it++){
                 if(it->second > r){
                     //at the force linear interpolated in between the two current forces
@@ -173,12 +194,9 @@ void MoveNonLinearForceEquilibrium::createTable(){
                 }
                 it_last=it;
             }
-
         }
     }
 }
-
-
 /*****************************************************************************/
 /**
  * @brief Initialize the move.

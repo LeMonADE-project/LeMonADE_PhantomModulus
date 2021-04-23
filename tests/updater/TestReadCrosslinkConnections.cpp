@@ -33,18 +33,19 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 #include <LeMonADE/core/Ingredients.h>
 #include <LeMonADE/feature/FeatureBox.h>
 #include <LeMonADE/feature/FeatureSystemInformationLinearMeltWithCrosslinker.h>
+
 #include <LeMonADE/utility/Vector3D.h>
 
 #include <extern/catch.hpp>
 
 #include <LeMonADE_PM/updater/UpdaterReadCrosslinkConnections.h>
-
+#include <LeMonADE_PM/feature/FeatureCrosslinkConnectionsLookUp.h>
 
 
 
 TEST_CASE( "Test class UpdaterReadCrosslinkConnections" ) 
 {
-    typedef LOKI_TYPELIST_2(FeatureBox, FeatureSystemInformationLinearMeltWithCrosslinker) Features;
+    typedef LOKI_TYPELIST_3(FeatureBox, FeatureSystemInformationLinearMeltWithCrosslinker,FeatureCrosslinkConnectionsLookUp) Features;
     typedef ConfigureSystem<VectorDouble3,Features,4> Config;
     typedef Ingredients<Config> IngredientsType;
 
@@ -62,7 +63,8 @@ TEST_CASE( "Test class UpdaterReadCrosslinkConnections" )
         std::ofstream out(filename); 
         out <<"# \n";
         out <<"\n";
-        out << 17 << " " << 1 << " " << 12 << " " << 12 << " "<< 3 << " "<< 2 << " "<< 0 << " "<< 12 << " "<< 1 << " "<< 3 <<"\n";
+        //   Time >>  ChainID >>    MonID1 >>       P1X >>     P1Y >>     P1Z >>   MonID2 >>      P2X >>     P2Y >>     P2Z
+        out << 17 << " " << 1 << " " << 12 << " " << 12 << " "<< 3 << " "<< 2 << " "<<  0 << " "<< 12 << " "<< 1 << " "<< 3 <<"\n";
         out << 17 << " " << 1 << " " << 13 << " " << 12 << " "<< 3 << " "<< 2 << " "<< 12 << " "<< 12 << " "<< 1 << " "<< 3 <<"\n";
 
         out << 19 << " " << 2 << " " << 14 << " " << 12 << " "<< 3 << " "<< 2 << " "<< 0 << " "<< 0 << " "<< 4 << " "<< 3 <<"\n";
@@ -112,6 +114,14 @@ TEST_CASE( "Test class UpdaterReadCrosslinkConnections" )
         ingredients.modifyMolecules().addMonomer(4.,6.,6.);//15
         ingredients.modifyMolecules().addMonomer(8.,6.,6.);//16
         
+        ingredients.modifyMolecules().connect(12,0);
+        ingredients.modifyMolecules().connect(12,1);
+        ingredients.modifyMolecules().connect(12,2);
+        ingredients.modifyMolecules().connect(12,3);
+        ingredients.modifyMolecules().connect(13,0);
+        ingredients.modifyMolecules().connect(14,1);
+        ingredients.modifyMolecules().connect(15,2);
+        ingredients.modifyMolecules().connect(16,3);
 
 
         ingredients.modifyMolecules().connect(13,4);
@@ -122,7 +132,23 @@ TEST_CASE( "Test class UpdaterReadCrosslinkConnections" )
         ingredients.modifyMolecules().connect(15,9);
         ingredients.modifyMolecules().connect(16,10);
         ingredients.modifyMolecules().connect(16,11);
+        
+        // for (auto i=0; i < ingredients.getMolecules().size(); i++){
+        for (auto i=0; i < 4; i++){
+            ingredients.modifyMolecules()[i].setReactive(true); 
+            ingredients.modifyMolecules()[i].setNumMaxLinks(2); 
+        }
 
+        ingredients.modifyMolecules()[12].setReactive(true); 
+        ingredients.modifyMolecules()[12].setNumMaxLinks(4); 
+        ingredients.modifyMolecules()[13].setReactive(true); 
+        ingredients.modifyMolecules()[13].setNumMaxLinks(4); 
+        ingredients.modifyMolecules()[14].setReactive(true); 
+        ingredients.modifyMolecules()[14].setNumMaxLinks(4); 
+        ingredients.modifyMolecules()[15].setReactive(true); 
+        ingredients.modifyMolecules()[15].setNumMaxLinks(4); 
+        ingredients.modifyMolecules()[16].setReactive(true); 
+        ingredients.modifyMolecules()[16].setNumMaxLinks(4); 
 
         REQUIRE(ingredients.getMolecules().size()==17 );
         REQUIRE_NOTHROW(ingredients.synchronize(ingredients));
@@ -146,7 +172,7 @@ TEST_CASE( "Test class UpdaterReadCrosslinkConnections" )
         REQUIRE(ingredients.getMolecules().areConnected(15,2) );
         REQUIRE(ingredients.getMolecules().areConnected(16,3) );
         
-
+        REQUIRE(0==remove(filename.c_str()));    
     }
     //restore cout 
     std::cout.rdbuf(originalBuffer);

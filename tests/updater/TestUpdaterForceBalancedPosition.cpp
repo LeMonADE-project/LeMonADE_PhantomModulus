@@ -35,6 +35,7 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <LeMonADE/utility/Vector3D.h>
 #include <LeMonADE/utility/DistanceCalculation.h>
+#include <LeMonADE/feature/FeatureSystemInformationLinearMeltWithCrosslinker.h>
 
 #include <extern/catch.hpp>
 
@@ -45,9 +46,10 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 
 
 
+
 TEST_CASE( "Test class UpdaterForceBalancedPosition" ) 
 {
-    typedef LOKI_TYPELIST_3(FeatureBox, FeatureCrosslinkConnectionsLookUp,FeatureFixedMonomers ) Features;
+    typedef LOKI_TYPELIST_4(FeatureBox, FeatureCrosslinkConnectionsLookUp,FeatureFixedMonomers,FeatureSystemInformationLinearMeltWithCrosslinker ) Features;
     typedef ConfigureSystem<VectorDouble3,Features,4> Config;
     typedef Ingredients<Config> IngredientsType;
 
@@ -71,7 +73,7 @@ TEST_CASE( "Test class UpdaterForceBalancedPosition" )
         ingredients.setPeriodicZ(1);
         // ingredients.modifyBondset().addBFMclassicBondset();
         //define 
-        ingredients.modifyMolecules().addMonomer(1.,123.,-19.);
+        ingredients.modifyMolecules().addMonomer(5.,134.,-11.);
         ingredients.modifyMolecules().addMonomer(6.,4.,6.);
         ingredients.modifyMolecules().addMonomer(6.,8.,6.);
         ingredients.modifyMolecules().addMonomer(4.,6.,6.);
@@ -102,10 +104,17 @@ TEST_CASE( "Test class UpdaterForceBalancedPosition" )
         ingredients.modifyMolecules().connect(4,11);
         ingredients.modifyMolecules().connect(4,12);
 
-        ingredients.modifyMolecules()[1].setMovableTag(false);
-        ingredients.modifyMolecules()[2].setMovableTag(false);
-        ingredients.modifyMolecules()[3].setMovableTag(false);
-        ingredients.modifyMolecules()[4].setMovableTag(false);
+        ingredients.modifyMolecules()[0].setReactive(true); 
+        ingredients.modifyMolecules()[0].setNumMaxLinks(4); 
+        ingredients.modifyMolecules()[1].setReactive(true); 
+        ingredients.modifyMolecules()[1].setNumMaxLinks(3); 
+        ingredients.modifyMolecules()[2].setReactive(true); 
+        ingredients.modifyMolecules()[2].setNumMaxLinks(3); 
+        ingredients.modifyMolecules()[3].setReactive(true); 
+        ingredients.modifyMolecules()[3].setNumMaxLinks(3); 
+        ingredients.modifyMolecules()[4].setReactive(true); 
+        ingredients.modifyMolecules()[4].setNumMaxLinks(3); 
+
         ingredients.modifyMolecules()[5].setMovableTag(false);
         ingredients.modifyMolecules()[6].setMovableTag(false);
         ingredients.modifyMolecules()[7].setMovableTag(false);
@@ -118,12 +127,12 @@ TEST_CASE( "Test class UpdaterForceBalancedPosition" )
         REQUIRE(ingredients.getMolecules().size()==13 );
         REQUIRE_NOTHROW(ingredients.synchronize(ingredients));
         //check some basics
-        UpdaterForceBalancedPosition<IngredientsType> updater(ingredients, 0.0001);
+        UpdaterForceBalancedPosition<IngredientsType,MoveForceEquilibrium> updater(ingredients, 0.0001);
         updater.execute();
         auto vec2=LemonadeDistCalcs::MinImageVector(VectorDouble3(0.,0.,0.),ingredients.getMolecules()[0].getVector3D(),ingredients );
-        REQUIRE(vec2.getX() == Approx(6.));
-        REQUIRE(vec2.getY() == Approx(6.));
-        REQUIRE(vec2.getZ() == Approx(6.));
+        REQUIRE(vec2.getX() == Approx(5.3125));
+        REQUIRE(vec2.getY() == Approx(6.375));
+        REQUIRE(vec2.getZ() == Approx(5.8125));
     }
     //restore cout 
     std::cout.rdbuf(originalBuffer);
