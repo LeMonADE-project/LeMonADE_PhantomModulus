@@ -24,8 +24,8 @@ You should have received a copy of the GNU General Public License
 along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 
 --------------------------------------------------------------------------------*/
-#ifndef LEMONADE_PM_UPDATER_UPDATERREADCROSSLINKCONNECTIONS_H 
-#define LEMONADE_PM_UPDATER_UPDATERREADCROSSLINKCONNECTIONS_H
+#ifndef LEMONADE_PM_UPDATER_UPDATERREADCROSSLINKCONNECTIONSTENDOMER_H 
+#define LEMONADE_PM_UPDATER_UPDATERREADCROSSLINKCONNECTIONSTENDOMER_H
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -37,7 +37,7 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 #include <LeMonADE/utility/DistanceCalculation.h>
 
 /**
- * @class UpdaterReadCrosslinkConnections
+ * @class UpdaterReadCrosslinkConnectionsTendomer
  * @brief reads in connections for a system made of linear chains and crosslinker 
  * 
  * @details 
@@ -49,10 +49,10 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 template <class IngredientsType>
-class UpdaterReadCrosslinkConnections : public AbstractUpdater
+class UpdaterReadCrosslinkConnectionsTendomer : public AbstractUpdater
 {
 public:
-    UpdaterReadCrosslinkConnections(
+    UpdaterReadCrosslinkConnectionsTendomer(
         IngredientsType& ing_, 
         const std::string input_, 
         const double stepwidth_, 
@@ -97,21 +97,8 @@ private:
   //!bond Table 
   std::map<std::pair<uint32_t,uint32_t>,std::vector<uint32_t> > bondTable;
 };
-
-
 template <class IngredientsType>
-bool UpdaterReadCrosslinkConnections<IngredientsType>::ConnectCrossLinkToChain(uint32_t MonID, uint32_t chainID){
-    // std::pair<uint32_t,uint32_t> key(MonID,chainID-1);
-    // if (bondTable.find(key) != bondTable.end()){
-    //     if ( !ing.getMolecules().areConnected( MonID,bondTable.at(key)[0] ) )
-    //         ing.modifyMolecules().connect(MonID,bondTable.at(key)[0] );
-    //     else 
-    //         ing.modifyMolecules().connect(MonID,bondTable.at(key)[1] );
-    // }else{
-    //     std::stringstream errormessage;
-    //     errormessage << "There was no such a connection in the bfm file for monomer ID= " << MonID << " with chainID=" << chainID-1<< "\n";
-    //     throw std::runtime_error(errormessage.str());
-    // }
+bool  UpdaterReadCrosslinkConnectionsTendomer<IngredientsType>::ConnectCrossLinkToChain(uint32_t MonID, uint32_t chainID){
     std::pair<uint32_t,uint32_t> key(MonID,chainID-1);
     if (bondTable.find(key) != bondTable.end()){
         if ( !ing.getMolecules().areConnected( MonID,bondTable.at(key)[0] ) ){
@@ -126,15 +113,14 @@ bool UpdaterReadCrosslinkConnections<IngredientsType>::ConnectCrossLinkToChain(u
     }
     return false; 
 }
-
 /**
  * @brief read in connections up to the minimum conversion given 
  * */
 template <class IngredientsType>
-void UpdaterReadCrosslinkConnections<IngredientsType>::initialize(){
+void UpdaterReadCrosslinkConnectionsTendomer<IngredientsType>::initialize(){
     //assume a stochiometric mixture
-    NMaxConnection=ing.getFunctionality()*ing.getNumOfCrosslinks();
-    NMonomerPerChain = ing.getNumOfMonomersPerChain();
+    NMaxConnection=4*ing.getNumCrossLinkers();
+    NMonomerPerChain = 2*ing.getNumMonomersPerChain();
     std::cout << "Number of maximum connection: " << NMaxConnection << std::endl;
     //erase bonds between reactive monomers
     for (uint32_t i =0 ; i <  ing.getMolecules().size(); i++)
@@ -144,8 +130,9 @@ void UpdaterReadCrosslinkConnections<IngredientsType>::initialize(){
                 if (ing.getMolecules()[neighbor].isReactive()){
                     ing.modifyMolecules().disconnect(i, neighbor );
                     uint32_t chainMonomer(std::min(i,neighbor) );
+                    uint32_t crosslink(std::max(i,neighbor));
                     uint32_t chainID( (chainMonomer-chainMonomer%NMonomerPerChain)/NMonomerPerChain);
-                    bondTable[std::pair<uint32_t,uint32_t>(std::max(i,neighbor),chainID) ].push_back(std::min(i,neighbor)) ;
+                    bondTable[std::pair<uint32_t,uint32_t>(crosslink,chainID) ].push_back(chainMonomer) ;
                 }
             }
     std::cout << "Erase " << bondTable.size() << " bonds." <<std::endl;
@@ -157,11 +144,10 @@ void UpdaterReadCrosslinkConnections<IngredientsType>::initialize(){
  * @details Copies the initial ingredients to the current one and adds connections up to the current conversion. 
  * */
 template <class IngredientsType>
-bool UpdaterReadCrosslinkConnections<IngredientsType>::execute(){
+bool UpdaterReadCrosslinkConnectionsTendomer<IngredientsType>::execute(){
     //reset the ingredients container to the inital one
     ing = initialIng;
-    //open input file to the connection table 
-    //! stream reading input file
+    //stream reading input file
     std::ifstream stream;
     stream.open(input);
     if (stream.fail())
@@ -178,28 +164,23 @@ bool UpdaterReadCrosslinkConnections<IngredientsType>::execute(){
     while (NewConnections < ReadNLines && stream.good()){
         std::string line;
         getline(stream, line);
-        if (line.empty() || line.at(0) == '#')
-            break;
+        if (line.empty() || line.at(0) == '#' )
+            continue;
         std::stringstream ss;
-        uint32_t Time, ChainID, MonID1, P1X, P1Y, P1Z, MonID2, P2X, P2Y, P2Z;
+        uint32_t Time, createBreak, ChainID, nSegments, MonID1, P1X, P1Y, P1Z, MonID2, P2X, P2Y, P2Z;
         ss << line;
-        ss >> Time >> ChainID >> MonID1 >> P1X >> P1Y >> P1Z >> MonID2 >> P2X >> P2Y >> P2Z;
+        ss >> Time >> createBreak>>  ChainID >> nSegments >>MonID1 >> P1X >> P1Y >> P1Z >> MonID2 >> P2X >> P2Y >> P2Z;
         #ifdef DEBUG
             std::cout << ss.str() << std::endl;
         #endif //DEBUG//
         ing.modifyMolecules().setAge(Time);
-        // ConnectCrossLinkToChain(MonID1, ChainID);
         if ( ConnectCrossLinkToChain(MonID1, ChainID+1) ) {
         }else if( ConnectCrossLinkToChain(MonID2, ChainID+1) ) {
         }else {
             std::stringstream errormessage;
-            errormessage << "There was no such a connection in the bfm file for monomer ID= " << MonID1  <<" with ID=" << MonID2 <<  " with chainID=" << ChainID<< "\n";
+            errormessage << "There was no such a connection in the bfm file for monomer ID= " << MonID1  <<" of with ID=" << MonID2 <<  " with chainID=" << ChainID<< "\n";
             throw std::runtime_error(errormessage.str());
         }
-        //update positions : I think this is not needed
-        // ing.modifyMolecules()[MonID1].modifyVector3D().setAllCoordinates(P1X, P1Y, P1Z);
-        // if (MonID2 > 0)
-            // ing.modifyMolecules()[MonID2].modifyVector3D().setAllCoordinates(P2X, P2Y, P2Z);
         NewConnections++;
     }
     std::cout << "Read and add " << NewConnections << "/" << NMaxConnection 
@@ -207,7 +188,7 @@ bool UpdaterReadCrosslinkConnections<IngredientsType>::execute(){
               << ing.getMolecules().getAge() << std::endl;
     ing.synchronize();
     nExecutions++;
-    std::cout << "UpdaterReadCrosslinkConnections::execute " << nExecutions << " times.\n";
+    std::cout << "UpdaterReadCrosslinkConnectionsTendomer::execute " << nExecutions << " times.\n";
     //close the filestream and return false if the file has ended and thus the updater has nothing more to do
     if (stream.eof()) {
         stream.close();
@@ -218,4 +199,4 @@ bool UpdaterReadCrosslinkConnections<IngredientsType>::execute(){
     }
 }
 
-#endif 
+#endif

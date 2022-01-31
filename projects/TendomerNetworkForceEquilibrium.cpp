@@ -41,18 +41,20 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 #include <LeMonADE/feature/FeatureMoleculesIOUnsaveCheck.h>
 #include <LeMonADE/feature/FeatureReactiveBonds.h>
 #include <LeMonADE/feature/FeatureBox.h>
-#include <LeMonADE/feature/FeatureSystemInformationLinearMeltWithCrosslinker.h>
+#include <LeMonADE/feature/FeatureLabel.h>
 #include <LeMonADE/utility/TaskManager.h>
+#include <LeMonADE/utility/RandomNumberGenerators.h>
 
 #include <extern/catchorg/clara/clara.hpp>
 
 #include <LeMonADE_PM/updater/UpdaterForceBalancedPosition.h>
-#include <LeMonADE_PM/updater/UpdaterReadCrosslinkConnections.h>
+#include <LeMonADE_PM/updater/UpdaterReadCrosslinkConnectionsTendomer.h>
 #include <LeMonADE_PM/updater/moves/MoveForceEquilibrium.h>
 #include <LeMonADE_PM/updater/moves/MoveNonLinearForceEquilibrium.h>
-#include <LeMonADE_PM/feature/FeatureCrosslinkConnectionsLookUp.h>
+#include <LeMonADE_PM/feature/FeatureCrosslinkConnectionsLookUpTendomers.h>
 #include <LeMonADE_PM/analyzer/AnalyzerEquilbratedPosition.h>
 #include <LeMonADE_PM/updater/UpdaterAffineDeformation.h>
+
 
 int main(int argc, char* argv[]){
 	try{
@@ -61,14 +63,12 @@ int main(int argc, char* argv[]){
 		std::string inputBFM("init.bfm");
 		std::string outputDataPos("CrosslinkPosition.dat");
 		std::string outputDataDist("ChainExtensionDistribution.dat");
-		// std::string inputConnection("BondCreationBreaking.dat");
-		std::string feCurve;
+		std::string feCurve("");
 		double relaxationParameter(10.);
 		double threshold(0.5);
-		double stepwidth(1.0);
-		double minConversion(50.0);
-		bool custom(true);
-        double stretching_factor(1.0);
+		double factor(0.995);
+		double stretching_factor(1.0);
+		uint32_t gauss(false);
         double dampingfactor(1.0);
 		double prestrainFactorX(1.0);
 		double prestrainFactorY(1.0);
@@ -77,15 +77,13 @@ int main(int argc, char* argv[]){
 		bool showHelp = false;
 		auto parser
 			= clara::detail::Opt(            inputBFM, "inputBFM (=inconfig.bfm)"                        ) ["-i"]["--input"            ] ("(required)Input filename of the bfm file"                                    ).required()
-			// | clara::detail::Opt(     inputConnection, "inputConnection (=BondCreationBreaking.dat)"     ) ["-d"]["--inputConnection"] ("used for the time development of the topology. "                             ).required()
 			| clara::detail::Opt(       outputDataPos, "outputDataPos (=CrosslinkPosition.dat)"          ) ["-o"]["--outputPos"        ] ("(optional) Output filename of the crosslink ID and the equilibrium Position.").optional()
 			| clara::detail::Opt(      outputDataDist, "outputDataDist (=ChainExtensionDistribution.dat)") ["-c"]["--outputDist"       ] ("(optional) Output filename of the chain extension distribution."             ).optional()
-			| clara::detail::Opt(           stepwidth, "stepwidth"                                       ) ["-s"]["--stepwidth"        ] ("(optional) Width for the increase in percentage. Default: 1%."               ).optional()
-			| clara::detail::Opt(       minConversion, "minConversion"                                   ) ["-u"]["--minConversion"    ] ("(optional) Minimum conversion to be read in. Default: 50%."                  ).optional()
 			| clara::detail::Opt(           threshold, "threshold"                                       ) ["-t"]["--threshold"        ] ("(optional) Threshold of the average shift. Default 0.5 ."                    ).optional()
-            | clara::detail::Opt(   stretching_factor, "stretching_factor (=1)"                          ) ["-l"]["--stretching_factor"] ("(optional) Stretching factor for uniaxial deformation. Default 1.0 ."        ).optional()
-			| clara::detail::Opt(             feCurve, "feCurve (="")"                                   ) ["-f"]["--feCurve"          ] ("(optional) Force-Extension curve. Default \"\"."                             ).optional()
+			| clara::detail::Opt(   stretching_factor, "stretching_factor (=1)"                          ) ["-l"]["--stretching_factor"] ("(optional) Stretching factor for uniaxial deformation. Default 1.0 ."        ).optional()
+			| clara::detail::Opt(             feCurve, "feCurve (="")"                                   ) ["-f"]["--feCurve"          ] ("(optional) Force-Extension curve. Default \"\"."                             ).required()
 			| clara::detail::Opt( relaxationParameter, "relaxationParameter (=10)"                       ) ["-r"]["--relax"            ] ("(optional) Relaxation parameter. Default 10.0 ."                             ).optional()
+			| clara::detail::Opt(               gauss, "gauss"                                           ) ["-g"]["--gauss"            ] ("(optional) Deforma with a Gaussian deformation behaviour. Default 1.0 ."     ).optional()
             | clara::detail::Opt(       dampingfactor, "damping (=1)"                                    ) ["-d"]["--damping"          ] ("(optional) Damping factor after 1E3MCS. Default 1.0."                        ).optional()
 			| clara::detail::Opt(    prestrainFactorX, "prestrainFactorX (=1)"                           ) ["-x"]["--prestrainFactorX" ] ("(optional) Prestrain factor in X. Default 1.0."                              ).optional()
 			| clara::detail::Opt(    prestrainFactorY, "prestrainFactorY (=1)"                           ) ["-y"]["--prestrainFactorY" ] ("(optional) Prestrain factor in Y. Default 1.0."                              ).optional()
@@ -93,39 +91,35 @@ int main(int argc, char* argv[]){
 			| clara::Help( showHelp );
 		
 	    auto result = parser.parse( clara::Args( argc, argv ) );
-	    if ( feCurve.empty() ) custom=false;
+	    
 	    if( !result ) {
 	      std::cerr << "Error in command line: " << result.errorMessage() << std::endl;
 	      exit(1);
 	    }else if(showHelp == true){
-	      std::cout << "Standard force equilibration for a end-linked network."<< std::endl;
+	      std::cout << "Simulator to connect linear chains with single monomers of certain functionality"<< std::endl;
 	      parser.writeToStream(std::cout);
 	      exit(0);
 	    }else{
 	      std::cout << "outputData            : " << outputDataPos          << std::endl;
 	      std::cout << "outputDataDist        : " << outputDataDist         << std::endl;
 	      std::cout << "inputBFM              : " << inputBFM               << std::endl; 
-	      std::cout << "custom FE             : " << custom                 << std::endl; 
-	      std::cout << "stepwidth             : " << stepwidth              << std::endl;
-          std::cout << "dampingfactor         : " << dampingfactor          << std::endl;
-	      std::cout << "minConversion         : " << minConversion          << std::endl;
 	      std::cout << "threshold             : " << threshold              << std::endl; 
+          std::cout << "dampingfactor         : " << dampingfactor          << std::endl;
 		  std::cout << "feCurve               : " << feCurve                << std::endl;
-          std::cout << "stretching_factor     : " << stretching_factor      << std::endl;
+		  std::cout << "gauss                 : " << gauss                  << std::endl;
+		  std::cout << "stretching_factor     : " << stretching_factor      << std::endl;
 		  std::cout << "prestrainFactorX      : " << prestrainFactorX       << std::endl;
 		  std::cout << "prestrainFactorY      : " << prestrainFactorY       << std::endl;
 		  std::cout << "prestrainFactorZ      : " << prestrainFactorZ       << std::endl;
 	    }
-		
-		
-
 		RandomNumberGenerators rng;
+		// rng.seedDefaultValuesAll();
 		rng.seedAll();
 		///////////////////////////////////////////////////////////////////////////////
 		///end options parsing
 		///////////////////////////////////////////////////////////////////////////////
 		//Read in th last Config 
-		typedef LOKI_TYPELIST_3(FeatureMoleculesIOUnsaveCheck, FeatureSystemInformationLinearMeltWithCrosslinker, FeatureReactiveBonds) Features;
+		typedef LOKI_TYPELIST_3(FeatureMoleculesIOUnsaveCheck, FeatureLabel, FeatureReactiveBonds) Features;
 		typedef ConfigureSystem<VectorInt3,Features, 7> Config;
 		typedef Ingredients<Config> Ing;
 		Ing myIngredients;
@@ -140,7 +134,7 @@ int main(int argc, char* argv[]){
 		taskmanager.cleanup();
 		std::cout << "Read in conformation and go on to bring it into equilibrium forces..." <<std::endl;
 		//the foce equilibrium is reached off lattice ( no integer values for the positions )
-		typedef LOKI_TYPELIST_3(FeatureBox, FeatureCrosslinkConnectionsLookUp ,FeatureSystemInformationLinearMeltWithCrosslinker) Features2;
+		typedef LOKI_TYPELIST_3(FeatureBox, FeatureCrosslinkConnectionsLookUpTendomers ,FeatureLabel) Features2;
 		typedef ConfigureSystem<VectorDouble3,Features2, 7> Config2;
 		typedef Ingredients<Config2> Ing2;
 		Ing2 myIngredients2;
@@ -153,11 +147,11 @@ int main(int argc, char* argv[]){
 		myIngredients2.setPeriodicZ(myIngredients.isPeriodicZ());
 		myIngredients2.modifyMolecules().resize(myIngredients.getMolecules().size());
 		myIngredients2.modifyMolecules().setAge(myIngredients.getMolecules().getAge());
-		myIngredients2.setNumOfChains              (myIngredients.getNumOfChains());
-		myIngredients2.setNumOfCrosslinks          (myIngredients.getNumOfCrosslinks());
-		myIngredients2.setNumOfMonomersPerChain    (myIngredients.getNumOfMonomersPerChain());
-		myIngredients2.setNumOfMonomersPerCrosslink(myIngredients.getNumOfMonomersPerCrosslink());
-		myIngredients2.setFunctionality            (myIngredients.getFunctionality());
+        
+        myIngredients2.setNumTendomers           (myIngredients.getNumTendomers());
+		myIngredients2.setNumCrossLinkers        (myIngredients.getNumCrossLinkers());
+		myIngredients2.setNumMonomersPerChain    (myIngredients.getNumMonomersPerChain());
+		myIngredients2.setNumLabelsPerTendomerArm(myIngredients.getNumLabelsPerTendomerArm());
 		
 		for(size_t i = 0; i< myIngredients.getMolecules().size();i++){
 			myIngredients2.modifyMolecules()[i].modifyVector3D()=myIngredients.getMolecules()[i].getVector3D();
@@ -170,31 +164,27 @@ int main(int argc, char* argv[]){
 			}
 		}
 		myIngredients2.synchronize();
-		
-        auto forceUpdater = new UpdaterForceBalancedPosition<Ing2,MoveNonLinearForceEquilibrium>(myIngredients2, threshold,dampingfactor);
-        if(custom)
-            forceUpdater->setFilename(feCurve);
-        forceUpdater->setRelaxationParameter(relaxationParameter);	
-        auto forceUpdater2 = new UpdaterForceBalancedPosition<Ing2,MoveForceEquilibrium>(myIngredients2, threshold,dampingfactor);
-        auto uniaxialDeformation = new UpdaterAffineDeformation<Ing2>(myIngredients2, stretching_factor,prestrainFactorX,prestrainFactorY,prestrainFactorZ);
-    
-        auto analyzer = new AnalyzerEquilbratedPosition<Ing2>(myIngredients2,outputDataPos,outputDataDist);
-		
-        TaskManager taskmanager2;
-        taskmanager2.addUpdater( uniaxialDeformation,0 );
-        //read bonds and positions stepwise
-        if(custom){
-            std::cout << "Use custom force-extension curve\n";
-            taskmanager2.addUpdater( forceUpdater );
-        }else{
-            std::cout << "Use gaussian force-extension relation\n";
-            taskmanager2.addUpdater( forceUpdater2 );
-        }
-        taskmanager2.addAnalyzer(analyzer);
-        //initialize and run
+
+		TaskManager taskmanager2;
+		taskmanager2.addUpdater( new UpdaterAffineDeformation<Ing2>(myIngredients2, stretching_factor,prestrainFactorX,prestrainFactorY,prestrainFactorZ),0 );
+		//read bonds and positions stepwise
+        auto updater = new UpdaterForceBalancedPosition<Ing2,MoveNonLinearForceEquilibrium>(myIngredients2, threshold, dampingfactor) ;
+        auto updater2 = new UpdaterForceBalancedPosition<Ing2,MoveForceEquilibrium>(myIngredients2, threshold,dampingfactor) ;
+		if ( gauss == 0 ){
+            updater->setFilename(feCurve);
+            updater->setRelaxationParameter(relaxationParameter);
+            std::cout << "TendomerNetworkForceEquilibrium: add UpdaterForceBalancedPosition<Ing2,MoveNonLinearForceEquilibrium>(myIngredients2, threshold) \n";
+        	taskmanager2.addUpdater( updater );
+		}else if (gauss == 1 ){
+			std::cout << "TendomerNetworkForceEquilibrium: add UpdaterForceBalancedPosition<Ing2,MoveForceEquilibrium>(myIngredients2, threshold) \n";
+			taskmanager2.addUpdater( updater2 );
+		}
+		taskmanager2.addAnalyzer(new AnalyzerEquilbratedPosition<Ing2>(myIngredients2,outputDataPos, outputDataDist));
+		//initialize and run
 		taskmanager2.initialize();
-		taskmanager2.run(1);
+		taskmanager2.run();
 		taskmanager2.cleanup();
+		
 	}
 	catch(std::exception& e){
 		std::cerr<<"Error:\n"

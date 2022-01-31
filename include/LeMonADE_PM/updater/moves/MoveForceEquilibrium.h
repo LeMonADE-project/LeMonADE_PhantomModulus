@@ -47,7 +47,9 @@ along with LeMonADE.  If not, see <http://www.gnu.org/licenses/>.
 
 class MoveForceEquilibrium:public MoveForceEquilibriumBase<MoveForceEquilibrium>{
 public:
-    MoveForceEquilibrium():bondlength(2.68){};
+    MoveForceEquilibrium():bondlength2(2.68*2.68){
+      std::cout << "Use the MoveForceEquilibrium\n";
+    };
 
     // overload initialise function to be able to set the moves index and direction if neccessary
     template <class IngredientsType> void init(const IngredientsType& ing);
@@ -57,19 +59,28 @@ public:
     template <class IngredientsType> bool check(IngredientsType& ing);
     template< class IngredientsType> void apply(IngredientsType& ing);
 
+    void setFilename(std::string filename_){}
+    //! get the filename for the force extension data 
+    std::string const getFilename(){}
+    
+    //! set the relaxation parameter for the cross link
+    void setRelaxationParameter(double relaxationChain_){}
+    //! get the relaxation parameter for the cross link 
+    double getRelaxationParameter(){}
 private:
     //average square bond length 
-    const double bondlength;
+    const double bondlength2;
+    //
 
     //Gaussina force extension relation 
     //f=R*3/(N*b^2)
     VectorDouble3 FE(VectorDouble3 extensionVector, double nSegs){
-        return extensionVector*3./((nSegs)*bondlength*bondlength);
+        return extensionVector*3./((nSegs)*bondlength2);
     }
     //Gaussian extension force relation 
     //R=-f/3*N*b^2
     VectorDouble3 EF(VectorDouble3 force, double nSegs){
-        return force/(3.)*(nSegs)*bondlength*bondlength;
+        return force/(3.)*(nSegs)*bondlength2;
     }
 
     //calculate the shift for the cross link
@@ -85,6 +96,7 @@ private:
                 VectorDouble3 vec(ing.getMolecules()[Neighbors[i].ID].getVector3D()-Position-Neighbors[i].jump);
                 avNSegments+=1./Neighbors[i].segDistance;
                 force+=FE(vec,Neighbors[i].segDistance);
+                // std::cout <<"MoveLFE " <<  ing.getMolecules()[Neighbors[i].ID].getVector3D() << "\t" << Neighbors[i].jump<< "\t" << Position << "\t" << vec << "\t" << force << std::endl;
             }
             shift=EF(force,1./avNSegments);
         }

@@ -75,7 +75,13 @@ public:
 	std::vector< std::vector<double> >  CalculateDistance();
 
 	//! just collects the id and the position for the cross links 
-	std::vector<std::vector<int> > CollectAveragePositions();
+	std::vector<std::vector<double> > CollectAveragePositions();
+
+    //! setter for the filenames
+    void setFilenames(std::string outAvPosBasename_, std::string outDistBasename_ ){
+        outAvPosBasename= outAvPosBasename_;
+        outDistBasename=outDistBasename_;
+    }
 };
 
 /*************************************************************************
@@ -102,18 +108,18 @@ std::vector< std::vector<double> >  AnalyzerEquilbratedPosition<IngredientsType>
 		auto neighbors(ingredients.getCrossLinkNeighborIDs(IDx));
 		for (size_t j=0; j < neighbors.size() ;j++){
 			VectorDouble3 vec(ingredients.getMolecules()[neighbors[j].ID].getVector3D()-ingredients.getMolecules()[IDx].getVector3D()-neighbors[j].jump);
-			VectorDouble3 vec2=LemonadeDistCalcs::MinImageVector(ingredients.getMolecules()[neighbors[j].ID].getVector3D(),ingredients.getMolecules()[IDx].getVector3D(),ingredients);
-			if ( vec.getLength() != vec2.getLength()) {
-				std::stringstream error_message;
-				error_message   << "AnalyzerEquilbratedPosition:\n"
-								<< "distance from jump=(" << vec  << ") \n"
-								<< "distance from  IMC=(" << vec2 << ") \n"
-								<< "jump vector=("<< neighbors[j].jump <<") \n" 
-								<< "position1=("<<ingredients.getMolecules()[IDx].getVector3D() <<") \n"
-								<< "position2=("<<ingredients.getMolecules()[neighbors[j].ID].getVector3D() <<") \n"
-								<< std::endl;
-				throw std::runtime_error(error_message.str());
-			}
+			// VectorDouble3 vec2=LemonadeDistCalcs::MinImageVector(ingredients.getMolecules()[neighbors[j].ID].getVector3D(),ingredients.getMolecules()[IDx].getVector3D(),ingredients);
+			// if ( vec.getLength() != vec2.getLength()) {
+			// 	std::stringstream error_message;
+			// 	error_message   << "AnalyzerEquilbratedPosition:\n"
+			// 					<< "distance from jump=(" << vec  << ") \n"
+			// 					<< "distance from  IMC=(" << vec2 << ") \n"
+			// 					<< "jump vector=("<< neighbors[j].jump <<") \n" 
+			// 					<< "position1=("<<ingredients.getMolecules()[IDx].getVector3D() <<") \n"
+			// 					<< "position2=("<<ingredients.getMolecules()[neighbors[j].ID].getVector3D() <<") \n"
+			// 					<< std::endl;
+			// 	throw std::runtime_error(error_message.str());
+			// }
 			dist[0].push_back(IDx);
 			dist[1].push_back(neighbors[j].ID);
 			dist[2].push_back(vec.getX());
@@ -128,8 +134,8 @@ std::vector< std::vector<double> >  AnalyzerEquilbratedPosition<IngredientsType>
 }
 ////////////////////////////////////////////////////////////////////////////////
 template< class IngredientsType >
-std::vector< std::vector<int> >  AnalyzerEquilbratedPosition<IngredientsType>::CollectAveragePositions(){
-	std::vector<std::vector<int> > AveragePosition(4, std::vector<int>());
+std::vector< std::vector<double> >  AnalyzerEquilbratedPosition<IngredientsType>::CollectAveragePositions(){
+	std::vector<std::vector<double> > AveragePosition(4, std::vector<double>());
 	auto crosslinkID(ingredients.getCrosslinkIDs());
 	for (size_t i = 0 ; i < crosslinkID.size(); i++){
 		auto IDx(crosslinkID[i]);
@@ -189,14 +195,14 @@ void AnalyzerEquilbratedPosition<IngredientsType>::dumpData()
 	std::cout << "////////////////////////////////////"<<std::endl;	
 
 	//output for the equilibrated positions 
-	std::vector< std::vector<int> > CrossLinkPositions=CollectAveragePositions() ;
+	std::vector< std::vector<double> > CrossLinkPositions=CollectAveragePositions() ;
 	std::stringstream commentAveragePosition;
 	commentAveragePosition<<"Created by AnalyzerEquilbratedPosition\n";
 	commentAveragePosition<<"ID's start at 0 \n";
 	commentAveragePosition<<"conversion="<<conversion<<"\n";
 	commentAveragePosition<<"ID equilibrated position\n";
 	std::stringstream outAvPos;
-	outAvPos<<   std::setprecision(2)<<   "C" << conversion;
+	outAvPos<<   std::setprecision(3)<<   "C" << conversion;
 	outAvPos << "_" << outAvPosBasename;
 	
 
@@ -217,7 +223,7 @@ void AnalyzerEquilbratedPosition<IngredientsType>::dumpData()
 	commentDistribution<<"Chain ID's start at 1 \n";
 	commentDistribution<<"ID1 ID2 vector length ChainID \n";
 	std::stringstream outDist;
-	outDist<<  std::setprecision(2) <<   "C" << conversion;
+	outDist<<  std::setprecision(3) <<   "C" << conversion;
 	outDist << "_" << outDistBasename;
 
 	ResultFormattingTools::writeResultFile(

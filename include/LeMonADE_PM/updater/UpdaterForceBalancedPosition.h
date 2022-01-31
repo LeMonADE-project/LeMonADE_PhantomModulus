@@ -40,10 +40,10 @@ class UpdaterForceBalancedPosition:public AbstractUpdater
 {
 public:
     //! constructor for UpdaterForceBalancedPosition
-    UpdaterForceBalancedPosition(IngredientsType& ing_, double threshold_ ):
-    ing(ing_),threshold(threshold_){};
+    UpdaterForceBalancedPosition(IngredientsType& ing_, double threshold_ , double decreaseFactor_=1.0):
+    ing(ing_),threshold(threshold_),decreaseFactor(decreaseFactor_){};
     
-    virtual void initialize(){}// init(move);};
+    virtual void initialize(){};
     bool execute();
     virtual void cleanup(){};  
 
@@ -55,24 +55,15 @@ private:
     
     //! threshold for the certainty 
     double threshold;
-    
+
     //! move to equilibrate the cross links by force equilibrium
     moveType move;
     
     //! random number generator 
     RandomNumberGenerators rng;
-    
-    // //! input filename for the MoveNonLinearForceEquilibrium
-    // std::string filename; 
-    // //! relaxation parameter
-    // double relaxationParameter;
-    // //!initialize of the move : MoveForceEquilibrium
-    // void init ( MoveForceEquilibrium& move ) {std::cout << "Nothing to initialize for this move type.\n";}
-    // //!initialize of the move :MoveNonLinearForceEquilibrium
-    // void init (MoveNonLinearForceEquilibrium& move ) {
-    //     move.setRelaxationParameter(relaxationParameter);
-    //     move.setFilename(filename);
-    // };
+
+    //! 
+    double decreaseFactor; 
     
 };
 template <class IngredientsType, class moveType>
@@ -96,13 +87,15 @@ bool UpdaterForceBalancedPosition<IngredientsType,moveType>::execute(){
                 NSuccessfulMoves++;
             }
         }
-        if( NSuccessfulMoves>0 ){
-            avShift/=(NSuccessfulMoves);
-        }else 
-            avShift=threshold*1.1;
         ing.modifyMolecules().setAge(ing.getMolecules().getAge()+1);
-        if (ing.getMolecules().getAge() %1000 == 0 )
+        if (ing.getMolecules().getAge() %1000 == 0 ){
             std::cout << "MCS: " << ing.getMolecules().getAge() << "  and average shift: " << avShift << std::endl;
+            
+        }
+        if (ing.getMolecules().getAge() %100 == 0 ){
+            setRelaxationParameter(move.getRelaxationParameter()*decreaseFactor);
+            // threshold*=decreaseFactor;
+        }
     }
     std::cout << "Finish equilibration with average shift per cross link < " << avShift << " after " << ing.getMolecules().getAge()-StartMCS <<std::endl;
     ing.modifyMolecules().setAge(StartMCS);
