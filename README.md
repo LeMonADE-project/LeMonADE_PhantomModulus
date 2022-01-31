@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5926422.svg)](https://doi.org/10.5281/zenodo.5926422)
 # LeMonADE - Phantom Modulus
 
 This software package calculates the Phantom modulus for the following systems: 
