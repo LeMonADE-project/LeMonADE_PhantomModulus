@@ -46,3 +46,11 @@ between cross-links.
 These systems are tendomer specific. A star is created and a monomer along the chain with a distance to the center 
 according to the tendomer distribution of the number of elastic segments is marked as fixed in space. 
 In a second system a double star is simulated. 
+
+## Authors
+
+Find the information about active developers, former contributors, and people who contributed in the [AUTHORS](AUTHORS.md) file.
+
+## License
+
+See the [LICENSE](LICENSE) in the root directory.
